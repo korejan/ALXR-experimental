@@ -1,0 +1,276 @@
+name: Quest Facial/Eye Tracking Release
+
+env:
+  CARGO_TERM_COLOR: always
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22 * * *"
+
+jobs:
+  prepare_release:
+    runs-on: windows-2022
+    outputs:
+      release_ref: ${{ steps.output_ref.outputs.release_ref }}
+      upload_url: ${{ steps.create_alxr_release.outputs.upload_url }}
+      release_id: ${{ steps.create_alxr_release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: 'facial-eye-tracking'
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Generate tag, set release ref
+        id: output_ref
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          $out = cargo xtask bump-alxr-versions --nightly
+          echo $out
+          echo "::set-output name=version_tag::$(echo $out | sls -CaseSensitive -Pattern '^v.*$')"
+          echo "::set-output name=release_ref::$(git rev-parse HEAD)"
+
+      - name: Create ALXR Release
+        id: create_alxr_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Release tag is taken from the gen_tag job.
+          tag_name: ${{ steps.output_ref.outputs.version_tag }}
+          release_name:  ${{ steps.output_ref.outputs.version_tag }}
+          # TODO: gather commit output_ref to post here in the body
+          body: |
+            Nightly release of ALXR: ${{ steps.output_ref.outputs.version_tag }}
+            Generated from commit: korejan/ALVR@${{ steps.output_ref.outputs.release_ref }}
+          draft: true
+          prerelease: false
+  
+  build_alxr_android_release:
+    runs-on: ubuntu-22.04
+    needs: [prepare_release]
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.1.8937393
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: ${{ needs.prepare_release.outputs.release_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Build / Install ALXR Android dependencies
+        run: |
+          sudo apt install sdkmanager
+          sudo sdkmanager "platforms;android-29" "platforms;android-33" "platform-tools" "build-tools;30.0.3" "ndk;25.1.8937393" # "cmake;3.22.1"
+          yes | sdkmanager --license
+
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          cargo install cargo-apk --git https://github.com/korejan/android-ndk-rs.git --branch android-manifest-entries
+
+          # Fetch alxr-engine submodule.
+          git submodule update --init --recursive
+
+          cargo xtask bump-alxr-versions --nightly
+            
+      - name: Build & Package alxr-android-quest-release
+        run: |
+          unset ANDROID_HOME
+          cargo xtask build-alxr-quest --release
+            
+      - name: Upload alxr-android-quest-release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_release.outputs.upload_url }}
+          asset_path: ./build/release/alxr_client_android/alxr-client-quest.apk
+          asset_name: alxr-client-quest.apk
+          asset_content_type: application/vnd.android.package-archive
+    
+  build_alxr_android_debug:
+    runs-on: ubuntu-22.04
+    needs: [prepare_release]
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.1.8937393
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: ${{ needs.prepare_release.outputs.release_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Build / Install ALXR Android dependencies
+        run: |
+          sudo apt install sdkmanager
+          sudo sdkmanager "platforms;android-29" "platforms;android-33" "platform-tools" "build-tools;30.0.3" "ndk;25.1.8937393" # "cmake;3.22.1"
+          yes | sdkmanager --license
+          
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          cargo install cargo-apk --git https://github.com/korejan/android-ndk-rs.git --branch android-manifest-entries
+          
+          # Fetch alxr-engine submodule.
+          git submodule update --init --recursive
+
+          cargo xtask bump-alxr-versions --nightly
+          
+      - name: Build & Package alxr-android-quest-debug
+        run: |
+          unset ANDROID_HOME
+          cargo xtask build-alxr-quest
+          cd ./build/debug/alxr_client_android
+          mv alxr-client-quest.apk alxr-client-quest-debug.apk
+      
+      - name: Upload alxr-android-quest-debug
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_release.outputs.upload_url }}
+          asset_path: ./build/debug/alxr_client_android/alxr-client-quest-debug.apk
+          asset_name: alxr-client-quest-debug.apk
+          asset_content_type: application/vnd.android.package-archive
+  
+  build_alxr_win_x64_release:
+    runs-on: windows-2022
+    needs: [prepare_release]
+    env:
+      RUST_BACKTRACE: 1
+      NINJA_HOME: 'C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: ${{ needs.prepare_release.outputs.release_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+          vulkan-use-cache: true
+      
+      - name: Build and install ALXR dependencies
+        run: |
+          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          # Fetch alxr-engine submodule.
+          git submodule update --init --recursive
+      
+      - name: Build & Package ALXR-Release win-x64 (.zip)
+        id: build-release
+        run: |
+          $env:Path="$env:NINJA_HOME;$env:Path"
+
+          cargo xtask bump-alxr-versions --nightly
+
+          # without nvidia/cuda
+          cargo xtask build-alxr-client --release --no-nvidia --oculus-ext
+          7z a -tzip .\build\alxr-client-win-x64.zip .\build\release\alxr_client_windows
+      
+      - name: Upload alxr-release win-x64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_release.outputs.upload_url }}
+          asset_path: ./build/alxr-client-win-x64.zip
+          asset_name: alxr-client-win-x64.zip
+          asset_content_type: application/zip
+    
+  build_alxr_win_x64_debug:
+    runs-on: windows-2022
+    needs: [prepare_release]
+    env:
+      RUST_BACKTRACE: 1
+      NINJA_HOME: 'C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: ${{ needs.prepare_release.outputs.release_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+          vulkan-use-cache: true
+      
+      - name: Build and install ALXR dependencies
+        run: |
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          # Fetch alxr-engine submodule.
+          git submodule update --init --recursive
+      
+      - name: Build & Package ALXR-Debug win-x64 (.zip)
+        id: build-debug
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          $env:Path="$env:NINJA_HOME;$env:Path"
+
+          cargo xtask bump-alxr-versions --nightly
+
+          # without nvidia/cuda
+          cargo xtask build-alxr-client --no-nvidia --oculus-ext
+          7z a -tzip .\build\alxr-client-win-x64-no.zip .\build\debug\alxr_client_windows
+      
+      - name: Upload alxr-debug win-x64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_release.outputs.upload_url }}
+          asset_path: ./build/alxr-client-win-x64-debug.zip
+          asset_name: alxr-client-win-x64-debug.zip
+          asset_content_type: application/zip
+  
+  publish_release:
+    runs-on: ubuntu-22.04
+    needs:
+      [
+        prepare_release,
+        build_alxr_android_release,
+        build_alxr_android_debug,
+        build_alxr_win_x64_release,
+        build_alxr_win_x64_debug
+      ]
+    steps:
+      - uses: eregon/publish-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_id: ${{ needs.prepare_release.outputs.release_id }}
