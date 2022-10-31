@@ -178,7 +178,7 @@ jobs:
           vulkan-query-version: latest
           vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
           vulkan-use-cache: true
-      
+
       - name: Build and install ALXR dependencies
         run: |
           "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
@@ -246,7 +246,7 @@ jobs:
 
           # without nvidia/cuda
           cargo xtask build-alxr-client --no-nvidia --oculus-ext
-          7z a -tzip .\build\alxr-client-win-x64-no.zip .\build\debug\alxr_client_windows
+          7z a -tzip .\build\alxr-client-win-x64-debug.zip .\build\debug\alxr_client_windows
       
       - name: Upload alxr-debug win-x64
         uses: actions/upload-release-asset@v1
