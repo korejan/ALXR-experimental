@@ -1,1 +1,3 @@
 # ALXR-experimental
+
+This repository is for nightly builds of experimental/work in progress branches of the [ALXR client](https://github.com/korejan/ALVR/wiki/ALXR-Client), stable release builds can be found [here](https://github.com/korejan/ALVR/releases), standard nightly builds can be forund [here](https://github.com/korejan/ALXR-nightly), more details can be found [here](https://github.com/korejan/ALVR/wiki/ALXR-Client).
