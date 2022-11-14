@@ -54,8 +54,6 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [prepare_release]
     env:
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.1.8937393
       RUST_BACKTRACE: 1
     steps:
       - name: Checkout code
@@ -67,19 +65,17 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
-      
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v1
       - name: Build / Install ALXR Android dependencies
         run: |
-          sudo apt install sdkmanager
-          sudo sdkmanager "platforms;android-29" "platforms;android-33" "platform-tools" "build-tools;30.0.3" "ndk;25.1.8937393" # "cmake;3.22.1"
-          yes | sdkmanager --license
-
-          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          rustup target add aarch64-linux-android
           cargo install cargo-apk --git https://github.com/korejan/android-ndk-rs.git --branch android-manifest-entries
 
           # Fetch alxr-engine submodule.
@@ -101,13 +97,11 @@ jobs:
           asset_path: ./build/release/alxr_client_android/alxr-client-quest.apk
           asset_name: alxr-client-quest.apk
           asset_content_type: application/vnd.android.package-archive
-    
+  
   build_alxr_android_debug:
     runs-on: ubuntu-22.04
     needs: [prepare_release]
     env:
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.1.8937393
       RUST_BACKTRACE: 1
     steps:
       - name: Checkout code
@@ -119,19 +113,17 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
-      
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v1      
       - name: Build / Install ALXR Android dependencies
-        run: |
-          sudo apt install sdkmanager
-          sudo sdkmanager "platforms;android-29" "platforms;android-33" "platform-tools" "build-tools;30.0.3" "ndk;25.1.8937393" # "cmake;3.22.1"
-          yes | sdkmanager --license
-          
-          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+        run: |         
+          rustup target add aarch64-linux-android
           cargo install cargo-apk --git https://github.com/korejan/android-ndk-rs.git --branch android-manifest-entries
           
           # Fetch alxr-engine submodule.
