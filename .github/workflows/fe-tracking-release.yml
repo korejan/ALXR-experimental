@@ -65,14 +65,12 @@ jobs:
         with:
           toolchain: stable
           override: true
-      # - uses: actions/setup-java@v3
-      #   with:
-      #     distribution: 'temurin'
-      #     java-version: '11'
-      # # selecting a toolchain either by action or manual `rustup` calls should happen
-      # # before the plugin, as the cache uses the current rustc version as its cache key
-      # - run: rustup update
-      # - uses: Swatinem/rust-cache@v1
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false"
       - name: Build / Install ALXR Android dependencies
         run: |
           rustup target add aarch64-linux-android
@@ -113,14 +111,12 @@ jobs:
         with:
           toolchain: stable
           override: true
-      # - uses: actions/setup-java@v3
-      #   with:
-      #     distribution: 'temurin'
-      #     java-version: '11'
-      # # selecting a toolchain either by action or manual `rustup` calls should happen
-      # # before the plugin, as the cache uses the current rustc version as its cache key
-      # - run: rustup update
-      # - uses: Swatinem/rust-cache@v1      
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false" 
       - name: Build / Install ALXR Android dependencies
         run: |         
           rustup target add aarch64-linux-android
@@ -164,7 +160,9 @@ jobs:
         with:
           toolchain: stable
           override: true
-      # - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false" 
       - uses: humbletim/setup-vulkan-sdk@v1.2.0
         with:
           vulkan-query-version: latest
@@ -214,7 +212,9 @@ jobs:
         with:
           toolchain: stable
           override: true
-      # - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false" 
       - uses: humbletim/setup-vulkan-sdk@v1.2.0
         with:
           vulkan-query-version: latest
