@@ -47,6 +47,7 @@ jobs:
           body: |
             Nightly release of ALXR: ${{ steps.output_ref.outputs.version_tag }}
             Generated from commit: korejan/ALVR@${{ steps.output_ref.outputs.release_ref }}
+            ## **Please note only server builds here are compatible.**
           draft: true
           prerelease: false
   
