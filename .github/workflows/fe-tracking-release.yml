@@ -228,13 +228,13 @@ jobs:
         with:
           repository: "korejan/ALVR"
           ref: ${{ needs.prepare_release.outputs.release_ref }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-targets: "false" 
+      # - uses: actions-rs/toolchain@v1
+      #   with:
+      #     toolchain: stable
+      #     override: true
+      # - uses: Swatinem/rust-cache@v2
+      #   with:
+      #     cache-targets: "false" 
       - uses: humbletim/setup-vulkan-sdk@v1.2.0
         with:
           vulkan-query-version: latest
@@ -256,9 +256,10 @@ jobs:
           "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
           $env:Path="$env:NINJA_HOME;$env:Path"
           cd alvr/openxr-client/alxr-engine-sys
-          Start-Process -FilePath ./build_libalxr.bat -Wait -NoNewWindow
+          Invoke-Expression -Command "./build_libalxr.bat"
+          cd ../../../build/libalxr/bin
+          7z a -tzip ../../libalxr-win-x64.zip .
           cd ../../../
-          7z a -tzip ./build/libalxr-win-x64.zip ./build/libalxr/bin
       
       - name: Upload libalxr-release win-x64
         uses: actions/upload-release-asset@v1
