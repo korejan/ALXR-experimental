@@ -86,7 +86,7 @@ jobs:
         run: |
           cargo xtask build-windows-deps
           cargo xtask publish-server --gpl
-          $file = Get-ChildItem -Name .\build\*.exe | Select-Object -f 1
+          $file = Get-ChildItem -Name ./build/*.exe | Select-Object -f 1
           echo "::set-output name=exe_filename::$file"
       
       # Assets upload: .exe, .zip
@@ -216,6 +216,60 @@ jobs:
           asset_name: alxr-client-quest-debug.apk
           asset_content_type: application/vnd.android.package-archive
   
+  build_libalxr_win_x64_release:
+    runs-on: windows-2022
+    needs: [prepare_release]
+    env:
+      RUST_BACKTRACE: 1
+      NINJA_HOME: 'C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: "korejan/ALVR"
+          ref: ${{ needs.prepare_release.outputs.release_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false" 
+      - uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+          vulkan-use-cache: true
+      # - uses: Jimver/cuda-toolkit@v0.2.10
+      #   id: cuda-toolkit
+      #   with:
+      #     method: 'network'
+      #     cuda: '12.1.0'
+      - name: Build and install LibALXR dependencies
+        run: |
+          # Fetch alxr-engine submodule.
+          git submodule update --init --recursive
+      
+      - name: Build & Package LibALXR-Release win-x64 (.zip)
+        id: build-release
+        run: |
+          "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+          $env:Path="$env:NINJA_HOME;$env:Path"
+          cd alvr/openxr-client/alxr-engine-sys
+          Start-Process -FilePath ./build_libalxr.bat -Wait -NoNewWindow
+          cd ../../../
+          7z a -tzip ./build/libalxr-win-x64.zip ./build/libalxr/bin
+      
+      - name: Upload libalxr-release win-x64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_release.outputs.upload_url }}
+          asset_path: ./build/libalxr-win-x64.zip
+          asset_name: libalxr-win-x64.zip
+          asset_content_type: application/zip
+  
   build_alxr_win_x64_release:
     runs-on: windows-2022
     needs: [prepare_release]
@@ -243,7 +297,7 @@ jobs:
 
       - name: Build and install ALXR dependencies
         run: |
-          "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
           # Fetch alxr-engine submodule.
           git submodule update --init --recursive
       
@@ -256,7 +310,7 @@ jobs:
 
           # without nvidia/cuda
           cargo xtask build-alxr-client --release --no-nvidia --oculus-ext
-          7z a -tzip .\build\alxr-client-win-x64.zip .\build\release\alxr_client_windows
+          7z a -tzip ./build/alxr-client-win-x64.zip ./build/release/alxr_client_windows
       
       - name: Upload alxr-release win-x64
         uses: actions/upload-release-asset@v1
@@ -295,7 +349,7 @@ jobs:
       
       - name: Build and install ALXR dependencies
         run: |
-          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
           # Fetch alxr-engine submodule.
           git submodule update --init --recursive
       
@@ -310,7 +364,7 @@ jobs:
 
           # without nvidia/cuda
           cargo xtask build-alxr-client --no-nvidia --oculus-ext
-          7z a -tzip .\build\alxr-client-win-x64-debug.zip .\build\debug\alxr_client_windows
+          7z a -tzip ./build/alxr-client-win-x64-debug.zip ./build/debug/alxr_client_windows
       
       - name: Upload alxr-debug win-x64
         uses: actions/upload-release-asset@v1
@@ -331,7 +385,8 @@ jobs:
         build_alxr_android_release,
         build_alxr_android_debug,
         build_alxr_win_x64_release,
-        build_alxr_win_x64_debug
+        build_alxr_win_x64_debug,
+        build_libalxr_win_x64_release
       ]
     steps:
       - uses: eregon/publish-release@v1
